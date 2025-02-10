@@ -142,45 +142,37 @@ def save_comment(comment: Comment, folder: Path) -> None:
         file.write(comment.text)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("repo", help="GitHub repository to back up (e.g. https://github.com/Akuli/porcupine)")
-    parser.add_argument("dest", help="Folder where to back up the repository (e.g. ./issues)")
-    parser.add_argument("--token", help="Github API token (optional, but specifying a token helps with rate limit issues)")
-    args = parser.parse_args()
-
-    m = re.fullmatch(r"(?:https://github.com/)?([^/]+)/([^/]+)/?", args.repo)
-    if m is None:
-        parser.error("repository must be given in https://github.com/user/repo format")
-    repo = Repo(m.group(1), m.group(2))
-
-    dest_folder = Path(args.dest)
-    print(f"Backing up issue and PR comments: https://github.com/{repo.owner}/{repo.repo} --> {dest_folder}")
-    dest_folder.mkdir(parents=True, exist_ok=True)
-
-    if args.token is not None:
-        set_token(args.token)
-
+def update_repo(repo_folder: Path) -> None:
     start_time = datetime.now(timezone.utc)
+    repo_info_txt = repo_folder / "info.txt"
+    since = None
+    github_url = None
 
-    try:
-        with (dest_folder / "info.txt").open("r") as file:
-            line = file.readline()
-            assert line.startswith("LastUpdated: ")
-            since = datetime.fromisoformat(line.split(": ")[1].strip())
-            since -= timedelta(minutes=10)  # in case clocks are out of sync
-    except FileNotFoundError:
-        since = None
-    else:
-        print(f"  Previous update on {since}. Updating only what has changed.")
+    with repo_info_txt.open("r") as file:
+        line = file.readline()
+        assert line.startswith("GithubURL: "), line
+        github_url = line.split(": ")[1].strip()
+        print(f"Backing up issue and PR comments: {github_url} --> {repo_folder}")
+
+        for line in file:
+            if line.startswith("LastUpdated: "):
+                since = datetime.fromisoformat(line.split(": ")[1].strip())
+                since -= timedelta(minutes=10)  # in case clocks are out of sync
+                print(f"  Updating only what has changed since {since}.")
+
+    m = re.fullmatch(r"https://github.com/([^/]+)/([^/]+)", github_url)
+    if not m:
+        raise ValueError(f"bad GithubURL: {github_url!r}")
+    user, reponame = m.groups()
+    repo = Repo(user, reponame)
 
     for issue_or_pr in repo.issues_and_prs(since):
         if issue_or_pr.is_pr:
             print(f"  Found PR #{issue_or_pr.number}: {issue_or_pr.title}")
-            issue_or_pr_folder = dest_folder / f"pr_{issue_or_pr.number:05}"
+            issue_or_pr_folder = repo_folder / f"pr_{issue_or_pr.number:05}"
         else:
             print(f"  Found issue #{issue_or_pr.number}: {issue_or_pr.title}")
-            issue_or_pr_folder = dest_folder / f"issue_{issue_or_pr.number:05}"
+            issue_or_pr_folder = repo_folder / f"issue_{issue_or_pr.number:05}"
 
         issue_or_pr_folder.mkdir(exist_ok=True)
 
@@ -208,8 +200,22 @@ def main() -> None:
             file.write(f"Title: {issue_or_pr.title}\n")
             file.write(f"Updated: {issue_or_pr.updated.isoformat()}\n")
 
-    with (dest_folder / "info.txt").open("w") as file:
+    with repo_info_txt.open("w") as file:
+        file.write(f"GithubURL: {github_url}\n")
         file.write(f"LastUpdated: {start_time}\n")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("folders", nargs=argparse.ONE_OR_MORE, help="Folders that contain info.txt with GithubURL (see README)")
+    parser.add_argument("--token", help="Github API token (optional, but helps with rate limit issues)")
+    args = parser.parse_args()
+
+    if args.token is not None:
+        set_token(args.token)
+
+    for repo_folder in args.folders:
+        update_repo(Path(repo_folder))
 
 
 main()
