@@ -16,11 +16,6 @@ session.headers["Accept"] = "application/vnd.github+json"
 session.headers["X-GitHub-Api-Version"] = "2022-11-28"
 
 
-def set_token(token: str) -> None:
-    """Authenticate all future requests with given token to prevent rate limit issues"""
-    session.headers["Authorization"] = f"Token {token}"
-
-
 class Repo:
     def __init__(self, owner: str, repo: str) -> None:
         self.owner = owner
@@ -212,7 +207,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.token is not None:
-        set_token(args.token)
+        session.headers["Authorization"] = f"Token {args.token}"
 
     for repo_folder in args.folders:
         update_repo(Path(repo_folder))
