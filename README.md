@@ -31,7 +31,7 @@ $ python3 ghbackup.py path/to/folder_that_contains_info_dot_txt --token $(cat my
 ```
 
 This assumes you have saved your GitHub token to file `my_secret_token.txt`.
-I don't recommend copy/pasting the token directly to command line (except in GitHub Actions),
+I don't recommend copy/pasting the token directly to command line,
 because the token may get saved in your bash history or similar.
 
 
