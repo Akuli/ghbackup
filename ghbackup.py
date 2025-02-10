@@ -159,42 +159,24 @@ def save_comment(comment: Comment, folder: Path) -> None:
         file.write(comment.text)
 
 
-def determine_issue_or_pr_folder(parent_folder: Path, issue_or_pr: Issue | PR) -> Path:
-    if isinstance(issue_or_pr, Issue):
-        prefix = "issue"
-    else:
-        prefix = "pr"
-
-    sanitized_title = re.sub(r"[^A-Za-z0-9-_]", "_", issue_or_pr.title)
-    result = parent_folder / f"{prefix}_{issue_or_pr.number}_{sanitized_title}"
-
-    for existing in parent_folder.iterdir():
-        if existing.is_dir() and existing.name.startswith(f"{prefix}_{issue_or_pr.number}_"):
-            # Exists, but with wrong name. Happens when title is changed.
-            existing.rename(result)
-            break
-
-    return result
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("repo", help="GitHub repository to back up (e.g. https://github.com/Akuli/porcupine)")
-    parser.add_argument("dest", type=Path, help="Folder where to back up the repository (e.g. ./issues)")
+    parser.add_argument("dest", help="Folder where to back up the repository (e.g. ./issues)")
     parser.add_argument("--token", help="Github API token (optional, but specifying a token helps with rate limit issues)")
     args = parser.parse_args()
-
-    dest_folder: Path = args.dest
 
     m = re.fullmatch(r"(?:https://github.com/)?([^/]+)/([^/]+)/?", args.repo)
     if m is None:
         parser.error("repository must be given in https://github.com/user/repo format")
     repo = Repo(m.group(1), m.group(2))
 
+    dest_folder = Path(args.dest)
+    print(f"Backing up issue and PR comments: https://github.com/{repo.owner}/{repo.repo} --> {dest_folder}")
+    dest_folder.mkdir(parents=True, exist_ok=True)
+
     if args.token is not None:
         set_token(args.token)
-
-    dest_folder.mkdir(parents=True, exist_ok=True)
 
     start_time = datetime.now(timezone.utc)
 
@@ -206,18 +188,17 @@ def main() -> None:
             since -= timedelta(minutes=10)  # in case clocks are out of sync
     except FileNotFoundError:
         since = None
-
-    repo_folder = args.dest
-    print(f"Backing up comments: https://github.com/{repo.owner}/{repo.repo} --> {repo_folder}")
-    repo_folder.mkdir(exist_ok=True)
+    else:
+        print(f"  Previous update on {since}. Updating only what has changed.")
 
     for issue_or_pr in repo.issues_and_prs(since):
         if isinstance(issue_or_pr, Issue):
             print(f"  Found issue #{issue_or_pr.number}: {issue_or_pr.title}")
+            issue_or_pr_folder = dest_folder / f"issue_{issue_or_pr.number:05}"
         else:
             print(f"  Found PR #{issue_or_pr.number}: {issue_or_pr.title}")
+            issue_or_pr_folder = dest_folder / f"pr_{issue_or_pr.number:05}"
 
-        issue_or_pr_folder = determine_issue_or_pr_folder(repo_folder, issue_or_pr)
         issue_or_pr_folder.mkdir(exist_ok=True)
 
         last_updated = None
