@@ -1,6 +1,6 @@
 from __future__ import annotations
 import requests
-from typing import Any, cast
+from typing import Any
 from datetime import datetime, timezone
 from collections.abc import Iterator
 
@@ -18,9 +18,9 @@ def set_token(token: str) -> None:
 
 
 class Repo:
-    def __init__(self, owner_and_repo: str) -> None:
-        # e.g. Akuli/porcupine
-        self.owner, self.repo = owner_and_repo.split("/")
+    def __init__(self, owner: str, repo: str) -> None:
+        self.owner = owner
+        self.repo = repo
 
     def issues_and_prs(self, since: datetime | None) -> Iterator[Issue | PR]:
         query_params: dict[str, Any] = {
@@ -51,7 +51,7 @@ class Repo:
 class Comment:
     def __init__(self, github_json: dict[str, Any]):
         self.github_id: int = github_json["id"]
-        self.text: str = github_json["body"]
+        self.text: str = github_json["body"] or ""
         self.author_username: str = github_json["user"]["login"]
 
         # Do not track edits of comments, because there is no way to check
@@ -111,4 +111,17 @@ class Issue(_IssueOrPR):
 
 
 class PR(_IssueOrPR):
-    pass
+    def __init__(self, github_json: dict[str, Any]) -> None:
+        super().__init__(github_json)
+        self._diff_url: str = github_json["pull_request"]["diff_url"]
+        self._patch_url: str = github_json["pull_request"]["patch_url"]
+
+    def get_diff(self) -> str:
+        r = requests.get(self._diff_url)
+        r.raise_for_status()
+        return r.text
+
+    def get_patch(self) -> str:
+        r = requests.get(self._patch_url)
+        r.raise_for_status()
+        return r.text
