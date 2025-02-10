@@ -26,7 +26,7 @@ class Repo:
         self.owner = owner
         self.repo = repo
 
-    def issues_and_prs(self, since: datetime | None) -> Iterator[Issue | PR]:
+    def issues_and_prs(self, since: datetime | None) -> Iterator[IssueOrPR]:
         query_params: dict[str, Any] = {
             "state": "all",  # open and closed
             "page": 1,
@@ -45,11 +45,8 @@ class Repo:
                 # End of list
                 break
 
-            for issue_or_pr in results:
-                if "pull_request" in issue_or_pr:
-                    yield PR(issue_or_pr)
-                else:
-                    yield Issue(issue_or_pr)
+            for result in results:
+                yield IssueOrPR(result)
             query_params["page"] += 1
 
 
@@ -69,12 +66,8 @@ class Comment:
 
 
 
-# Internal base class
-class _IssueOrPR:
+class IssueOrPR:
     def __init__(self, github_json: dict[str, Any]) -> None:
-        if type(self) is _IssueOrPR:
-            raise RuntimeError("_IssueOrPR cannot be instantiated directly, instantiate Issue or PR instead")
-
         # The JSON has same fields that comments have
         self._initial_comment = Comment(github_json)
 
@@ -87,9 +80,7 @@ class _IssueOrPR:
         # The "created_at" field is in the initial comment
         self.updated = datetime.fromisoformat(github_json["updated_at"])
 
-    def __repr__(self) -> str:
-        # Example: <issue #123>
-        return f"<{type(self).__name__} #{self.number}>"
+        self.is_pr = "pull_request" in github_json
 
     def iter_comments(self, since: datetime | None) -> Iterator[Comment]:
         yield self._initial_comment
@@ -112,14 +103,6 @@ class _IssueOrPR:
                 for result in results:
                     yield Comment(result)
                 query_params["page"] += 1
-
-
-class Issue(_IssueOrPR):
-    pass
-
-
-class PR(_IssueOrPR):
-    pass
 
 
 def save_comment(comment: Comment, folder: Path) -> None:
@@ -192,12 +175,12 @@ def main() -> None:
         print(f"  Previous update on {since}. Updating only what has changed.")
 
     for issue_or_pr in repo.issues_and_prs(since):
-        if isinstance(issue_or_pr, Issue):
-            print(f"  Found issue #{issue_or_pr.number}: {issue_or_pr.title}")
-            issue_or_pr_folder = dest_folder / f"issue_{issue_or_pr.number:05}"
-        else:
+        if issue_or_pr.is_pr:
             print(f"  Found PR #{issue_or_pr.number}: {issue_or_pr.title}")
             issue_or_pr_folder = dest_folder / f"pr_{issue_or_pr.number:05}"
+        else:
+            print(f"  Found issue #{issue_or_pr.number}: {issue_or_pr.title}")
+            issue_or_pr_folder = dest_folder / f"issue_{issue_or_pr.number:05}"
 
         issue_or_pr_folder.mkdir(exist_ok=True)
 
