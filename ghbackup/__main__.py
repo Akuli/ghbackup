@@ -13,27 +13,27 @@ repos = [
 
 def save_comment(comment: Comment, folder: Path) -> None:
     file_path = None
-    number = 1
+    next_number = 1
 
     for path in folder.iterdir():
         if not path.is_file():
             continue
 
-        m = re.match('(\d+)_.*\.txt', path.name)
-        if m is None:
+        m = re.fullmatch(r"(\d+)_(.*)\.txt", path.name)
+        if not m:
             continue
-        number = max(m.group(0) + 1, number)
 
-        comment_count += 1
-        with item.open("r", encoding="utf-8") as file:
-            if file.readline() == f"GitHub ID: {comment.github_id}\n":
-                # Overwrite this file
-                file_path = path
-                break
+        next_number = max(int(m.group(1)) + 1, next_number)
+        if m.group(2) == comment.author_username:
+            with path.open("r", encoding="utf-8") as file:
+                if file.readline() == f"GitHub ID: {comment.github_id}\n":
+                    # Overwrite this file
+                    file_path = path
+                    break
 
     if file_path is None:
         # New comment, do not overwrite, use next sequential number
-        file_path = folder / f"{number}_{comment.author_username}.txt"
+        file_path = folder / f"{next_number:04}_{comment.author_username}.txt"
 
     with file_path.open("w", encoding="utf-8") as file:
         file.write(f"GitHub ID: {comment.github_id}\n")
@@ -43,7 +43,7 @@ def save_comment(comment: Comment, folder: Path) -> None:
         file.write(comment.text)
 
 
-def determine_issue_or_pr_folder(parent_folder: Path, issue_or_pr: Issue | PR) -> str:
+def determine_issue_or_pr_folder(parent_folder: Path, issue_or_pr: Issue | PR) -> Path:
     if isinstance(issue_or_pr, Issue):
         prefix = "issue"
     else:
@@ -63,7 +63,9 @@ def determine_issue_or_pr_folder(parent_folder: Path, issue_or_pr: Issue | PR) -
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--token', help="Github API token (optional, but specifying a token helps with rate limit issues)")
+    parser.add_argument("repo", help="GitHub repository to back up in user/repo format (e.g. Akuli/porcupine)")
+    parser.add_argument("dest", help="Folder where to back up the repository (e.g. ./issues)")
+    parser.add_argument("--token", help="Github API token (optional, but specifying a token helps with rate limit issues)")
     args = parser.parse_args()
 
     if args.token is not None:
@@ -74,19 +76,17 @@ def main() -> None:
         since = datetime.now(timezone.utc) - timedelta(days=1)
 
         repo_folder = Path(repo.repo)
-        print(f"Backing up comments: https://github.com/{repo.owner}/{repo.repo} --> to ./{repo_folder}")
+        print(f"Backing up comments: https://github.com/{repo.owner}/{repo.repo} --> {repo_folder}")
+        repo_folder.mkdir(exist_ok=True)
 
         for issue_or_pr in repo.issues_and_prs(since):
             if isinstance(issue_or_pr, Issue):
-                what_is_it_short = "issue"
-                what_is_it_long = "issue"
+                print(f"  Found issue #{issue_or_pr.number}: {issue_or_pr.title}")
             else:
-                what_is_it_short = "pull request"
-                what_is_it_long = "pr"
-            print(f"  Found {what_is_it_long} #{issue_or_pr.number}: {issue_or_pr.title}")
+                print(f"  Found PR #{issue_or_pr.number}: {issue_or_pr.title}")
 
-            issue_or_pr_folder = repo_folder / f"{what_is_it_short}_{issue_or_pr.number}_{sanitize()}"
-            issue_or_pr_folder.mkdir(parents=True, exist_ok=True)
+            issue_or_pr_folder = determine_issue_or_pr_folder(repo_folder, issue_or_pr)
+            issue_or_pr_folder.mkdir(exist_ok=True)
 
             for comment in issue_or_pr.iter_comments(since):
                 print(f"    Found comment from {comment.author_username}")
@@ -94,11 +94,9 @@ def main() -> None:
 
             # Write info after all comments, so that the issue or pull request
             # is not considered to be up-to-date if something errors
-            file_headers = {
-                "Title": issue_or_pr.title,
-                "Updated": issue_or_pr.updated,
-            }
-            (issue_or_pr_folder / "info.txt").write_text(format_headers(file_headers))
+            with (issue_or_pr_folder / "info.txt").open("w") as file:
+                file.write(f"Title: {issue_or_pr.title}\n")
+                file.write(f"Updated: {issue_or_pr.updated.isoformat()}\n")
 
 
 main()
