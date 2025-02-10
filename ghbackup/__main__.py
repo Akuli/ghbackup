@@ -86,12 +86,12 @@ def main() -> None:
         with (dest_folder / "info.txt").open("r") as file:
             line = file.readline()
             assert line.startswith("LastUpdated: ")
-            since = datetime.fromisoformat(line.split(": ")[1])
+            since = datetime.fromisoformat(line.split(": ")[1].strip())
             since -= timedelta(minutes=10)  # in case clocks are out of sync
     except FileNotFoundError:
         since = None
 
-    repo_folder = args.dest / repo.repo
+    repo_folder = args.dest
     print(f"Backing up comments: https://github.com/{repo.owner}/{repo.repo} --> {repo_folder}")
     repo_folder.mkdir(exist_ok=True)
 
@@ -104,9 +104,28 @@ def main() -> None:
         issue_or_pr_folder = determine_issue_or_pr_folder(repo_folder, issue_or_pr)
         issue_or_pr_folder.mkdir(exist_ok=True)
 
+        last_updated = None
+        try:
+            with (issue_or_pr_folder / "info.txt").open("r") as file:
+                for line in file:
+                    if line.startswith("Updated: "):
+                        last_updated = datetime.fromisoformat(line.split(": ")[1].strip())
+                        break
+        except FileNotFoundError:
+            pass
+
+        if issue_or_pr.updated == last_updated:
+            print("    Already up to date")
+            continue
+
         if isinstance(issue_or_pr, PR):
-            (issue_or_pr_folder / f"{issue_or_pr.number}.diff").write_text(issue_or_pr.get_diff())
-            (issue_or_pr_folder / f"{issue_or_pr.number}.patch").write_text(issue_or_pr.get_patch())
+            diff_path = issue_or_pr_folder / "diff"
+            patch_path = issue_or_pr_folder / "patch"
+
+            print("    Downloading diff...")
+            diff_path.write_text(issue_or_pr.get_diff())
+            print("    Downloading patch...")
+            patch_path.write_text(issue_or_pr.get_patch())
 
         for comment in issue_or_pr.iter_comments(since):
             print(f"    Found comment from {comment.author_username}")
