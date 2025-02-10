@@ -16,33 +16,28 @@ session.headers["Accept"] = "application/vnd.github+json"
 session.headers["X-GitHub-Api-Version"] = "2022-11-28"
 
 
-class Repo:
-    def __init__(self, owner: str, repo: str) -> None:
-        self.owner = owner
-        self.repo = repo
+def issues_and_prs(owner: str, repo: str, since: datetime | None) -> Iterator[IssueOrPR]:
+    query_params: dict[str, Any] = {
+        "state": "all",  # open and closed
+        "page": 1,
+        "per_page": 100,
+    }
+    if since is not None:
+        assert since.tzinfo == timezone.utc
+        query_params["since"] = since.isoformat(timespec='seconds')
 
-    def issues_and_prs(self, since: datetime | None) -> Iterator[IssueOrPR]:
-        query_params: dict[str, Any] = {
-            "state": "all",  # open and closed
-            "page": 1,
-            "per_page": 100,
-        }
-        if since is not None:
-            assert since.tzinfo == timezone.utc
-            query_params["since"] = since.isoformat(timespec='seconds')
+    while True:
+        r = session.get(f"https://api.github.com/repos/{owner}/{repo}/issues", params=query_params)
+        r.raise_for_status()
 
-        while True:
-            r = session.get(f"https://api.github.com/repos/{self.owner}/{self.repo}/issues", params=query_params)
-            r.raise_for_status()
+        results: list[dict[str, Any]] = r.json()
+        if not results:
+            # End of list
+            break
 
-            results: list[dict[str, Any]] = r.json()
-            if not results:
-                # End of list
-                break
-
-            for result in results:
-                yield IssueOrPR(result)
-            query_params["page"] += 1
+        for result in results:
+            yield IssueOrPR(result)
+        query_params["page"] += 1
 
 
 class Comment:
@@ -159,9 +154,8 @@ def update_repo(repo_folder: Path) -> None:
     if not m:
         raise ValueError(f"bad GithubURL: {github_url!r}")
     user, reponame = m.groups()
-    repo = Repo(user, reponame)
 
-    for issue_or_pr in repo.issues_and_prs(since):
+    for issue_or_pr in issues_and_prs(user, reponame, since):
         if issue_or_pr.is_pr:
             print(f"  Found PR #{issue_or_pr.number}: {issue_or_pr.title}")
             issue_or_pr_folder = repo_folder / f"pr_{issue_or_pr.number:05}"
