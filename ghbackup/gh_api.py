@@ -111,17 +111,4 @@ class Issue(_IssueOrPR):
 
 
 class PR(_IssueOrPR):
-    def __init__(self, github_json: dict[str, Any]) -> None:
-        super().__init__(github_json)
-        self._diff_url: str = github_json["pull_request"]["diff_url"]
-        self._patch_url: str = github_json["pull_request"]["patch_url"]
-
-    def get_diff(self) -> str:
-        r = requests.get(self._diff_url)
-        r.raise_for_status()
-        return r.text
-
-    def get_patch(self) -> str:
-        r = requests.get(self._patch_url)
-        r.raise_for_status()
-        return r.text
+    pass

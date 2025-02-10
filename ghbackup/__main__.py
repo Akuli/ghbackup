@@ -118,15 +118,6 @@ def main() -> None:
             print("    Already up to date")
             continue
 
-        if isinstance(issue_or_pr, PR):
-            diff_path = issue_or_pr_folder / "diff"
-            patch_path = issue_or_pr_folder / "patch"
-
-            print("    Downloading diff...")
-            diff_path.write_text(issue_or_pr.get_diff())
-            print("    Downloading patch...")
-            patch_path.write_text(issue_or_pr.get_patch())
-
         for comment in issue_or_pr.iter_comments(since):
             print(f"    Found comment from {comment.author_username}")
             save_comment(comment, issue_or_pr_folder)
