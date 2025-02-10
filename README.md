@@ -12,7 +12,7 @@ $ pip install -r requirements.txt
 Create an empty directory, and place a file named `info.txt` in it with the following content:
 
 ```
-GithubURL: https://github.com/Akuli/jou
+GitHub URL: https://github.com/Akuli/jou
 ```
 
 (or whatever repository you want to back up).
@@ -24,7 +24,9 @@ $ python3 ghbackup.py path/to/folder_that_contains_info_dot_txt
 
 This will copy all issue and pull request comments from GitHub to your local folder.
 
-If you get rate limit issues, you can pass a GitHub token:
+If you get rate limit errors,
+you can either run the same command again later (will continue where it left off, not start from scratch).
+Alternatively, you can pass a GitHub token:
 
 ```
 $ python3 ghbackup.py path/to/folder_that_contains_info_dot_txt --token $(cat my_secret_token.txt)
