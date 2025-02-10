@@ -26,6 +26,7 @@ class Repo:
         query_params: dict[str, Any] = {
             "state": "all",  # open and closed
             "page": 1,
+            "per_page": 100,
         }
         if since is not None:
             assert since.tzinfo == timezone.utc
@@ -70,10 +71,12 @@ class _IssueOrPR:
         if type(self) is _IssueOrPR:
             raise RuntimeError("_IssueOrPR cannot be instantiated directly, instantiate Issue or PR instead")
 
-        self._comments_url = github_json["comments_url"]
-
         # The JSON has same fields that comments have
         self._initial_comment = Comment(github_json)
+
+        self._comments_other_than_initial_count: int = github_json["comments"]
+        self._comments_url = github_json["comments_url"]
+
         self.title: str = github_json["title"]
         self.number: int = github_json["number"]
 
@@ -87,23 +90,24 @@ class _IssueOrPR:
     def iter_comments(self, since: datetime | None) -> Iterator[Comment]:
         yield self._initial_comment
 
-        query_params: dict[str, Any] = {"page": 1}
-        if since is not None:
-            assert since.tzinfo == timezone.utc
-            query_params["since"] = since.isoformat(timespec='seconds')
+        if self._comments_other_than_initial_count != 0:
+            query_params: dict[str, Any] = {"page": 1, "per_page": 100}
+            if since is not None:
+                assert since.tzinfo == timezone.utc
+                query_params["since"] = since.isoformat(timespec='seconds')
 
-        while True:
-            r = session.get(self._comments_url, params=query_params)
-            r.raise_for_status()
+            while True:
+                r = session.get(self._comments_url, params=query_params)
+                r.raise_for_status()
 
-            results: list[dict[str, Any]] = r.json()
-            if not results:
-                # End of list
-                break
+                results: list[dict[str, Any]] = r.json()
+                if not results:
+                    # End of list
+                    break
 
-            for result in results:
-                yield Comment(result)
-            query_params["page"] += 1
+                for result in results:
+                    yield Comment(result)
+                query_params["page"] += 1
 
 
 class Issue(_IssueOrPR):
