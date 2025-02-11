@@ -98,7 +98,14 @@ def save_comment(comment: dict[str, Any], folder: Path) -> None:
         file.write(f"Author: {author}\n")
         file.write(f"Created: {comment['created_at']}\n")
         file.write("\n")
-        file.write(comment["body"] or "")
+
+        # Fix GitHub weirdness:
+        #  - issue description/body may be null
+        #  - issue description/body does not necessarily end with \n
+        body = comment["body"] or ""
+        if not body.endswith("\n"):
+            body += "\n"
+        file.write(body)
 
 
 def update_repo(repo_folder: Path) -> None:
@@ -114,7 +121,7 @@ def update_repo(repo_folder: Path) -> None:
         print(f"Backing up issue and PR comments: {github_url} --> {repo_folder}")
 
         for line in file:
-            if line.startswith("Last Updated: "):
+            if line.startswith("Updated: "):
                 since = datetime.fromisoformat(line.split(": ")[1].strip())
                 since -= timedelta(minutes=10)  # in case clocks are out of sync
                 print(f"  Updating only what has changed since {since}.")
@@ -160,7 +167,7 @@ def update_repo(repo_folder: Path) -> None:
 
     with repo_info_txt.open("w") as file:
         file.write(f"GitHub URL: {github_url}\n")
-        file.write(f"Last Updated: {start_time}\n")
+        file.write(f"Updated: {start_time}\n")
 
 
 def main() -> None:
