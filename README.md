@@ -5,8 +5,8 @@ This way you can look at GitHub issues and pull requests of your projects
 even if GitHub is down or your internet doesn't work.
 
 **This script does not download the content of the repository itself, only issue and PR comments.**
-That would be unnecessary, because by design, Git repositories are difficult to delete accidentally:
-every developer has a local clone of the whole repository.
+By design, Git repositories are always somewhat backed up,
+because every developer has a local clone of the whole repository.
 
 
 ## Usage
@@ -101,6 +101,33 @@ Any thoughts on the package manager?
 ```
 
 
-## Deploying
+## Automating
 
-TODO: document my setup
+I added the following to a shell script that runs every time I log in:
+
+```
+# github issues/PR comments backup
+(
+    [ -d gh-backups ] || git init gh-backups
+    cd gh-backups
+    [ -f ghbackup.py ] || wget https://raw.githubusercontent.com/Akuli/ghbackup/refs/heads/main/ghbackup.py
+    function add_repo {
+        local url=$1
+        local dir=$(basename $url)
+        [ -f $dir/info.txt ] || (mkdir -vp $dir && echo "GitHub URL: $url" | tee $dir/info.txt)
+    }
+    add_repo https://github.com/Akuli/3d-game-experiment
+    add_repo https://github.com/Akuli/3dthingy
+    add_repo https://github.com/Akuli/asda
+    add_repo https://github.com/Akuli/catris
+    ...more repos...
+    while sleep 1h; do
+        python3 -u ghbackup.py */ || true  # may fail due to GitHub API rate limit
+        if git status --porcelain | grep -vE '^ M [^/]*/info.txt$'; then
+            # Something other than repo updated timestamps was changed
+            git add .
+            git commit -m "Automatic github backup on $(date)"
+        fi
+    done
+) &>ghbackup-log.txt &
+```
