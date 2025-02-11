@@ -89,7 +89,7 @@ def save_comment(comment: dict[str, Any], folder: Path) -> None:
             with path.open("r", encoding="utf-8") as file:
                 if file.readline() == f"GitHub ID: {comment['id']}\n":
                     number = int(m.group(1))
-                    print(f"      Comment number {number} from {author} has been edited, overwriting")
+                    print(f"      Comment number {number} from {author} has been downloaded already, overwriting")
                     path.unlink()
                     break
 
