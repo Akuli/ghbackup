@@ -1,6 +1,7 @@
 from __future__ import annotations
 import argparse
 import re
+import sys
 from typing import Any
 from datetime import datetime, timezone, timedelta
 from collections.abc import Iterator
@@ -122,6 +123,11 @@ def update_repo(repo_folder: Path) -> None:
 
         for line in file:
             if line.startswith("Updated: "):
+                # Python 3.11 and newer supports github's Z suffix syntax
+                # Example: "2025-02-07T23:47:23Z"
+                # https://docs.python.org/3/whatsnew/3.11.html#datetime
+                if sys.version_info < (3, 11):
+                    line = line.replace('Z', '+00:00')
                 since = datetime.fromisoformat(line.split(": ")[1].strip())
                 since -= timedelta(minutes=10)  # in case clocks are out of sync
                 print(f"  Updating only what has changed since {since}.")
@@ -146,12 +152,12 @@ def update_repo(repo_folder: Path) -> None:
             with (issue_or_pr_folder / "info.txt").open("r") as file:
                 for line in file:
                     if line.startswith("Updated: "):
-                        last_updated = datetime.fromisoformat(line.split(": ")[1].strip())
+                        last_updated = line.split(": ")[1].strip()
                         break
         except FileNotFoundError:
             pass
 
-        if datetime.fromisoformat(issue_or_pr["updated_at"]) == last_updated:
+        if issue_or_pr["updated_at"] == last_updated:
             print("    Already up to date")
             continue
 
@@ -171,6 +177,11 @@ def update_repo(repo_folder: Path) -> None:
 
 
 def main() -> None:
+    if sys.version_info < (3, 9):
+        print()
+        print("Warning: Python version is older than 3.9. This script may or may not work...")
+        print()
+
     parser = argparse.ArgumentParser()
     parser.add_argument("folders", nargs=argparse.ONE_OR_MORE, help="Folders that contain info.txt with GitHub URL (see README)")
     parser.add_argument("--token", help="Github API token (optional, but helps with rate limit issues)")

@@ -99,3 +99,48 @@ Created: 2023-12-24T03:13:38Z
 
 Any thoughts on the package manager?
 ```
+
+
+## Deploying
+
+I configured a server to run this script periodically.
+
+On remote server, create an account, and set permissions so that you can add files to its home folder:
+
+```
+$ sudo apt install python3-requests
+$ sudo adduser --system ghbackup
+$ sudo chown ghbackup:$USER /home/ghbackup
+$ sudo chmod g+w /home/ghbackup
+```
+
+Locally:
+
+```
+$ scp ghbackup.py my_remote_server:/home/ghbackup/ghbackup.py
+$ scp ghbackup.service my_remote_server:/tmp/
+```
+
+On remote server: (using `ghbackup$` to denote a shell running as `ghbackup` user)
+
+```
+$ sudo -u ghbackup bash
+ghbackup$ cd
+ghbackup$ umask 0022                # create readable directories and files
+ghbackup$ git init backups
+ghbackup$ cd backups
+ghbackup$ git config user.name "backup bot"
+ghbackup$ git config user.email "whatever@example.com"
+ghbackup$ exit
+$ cat /tmp/ghbackup.service | sudo tee /etc/systemd/system/ghbackup.service
+$ rm /tmp/ghbackup.service
+$ sudo systemctl enable ghbackup
+$ sudo systemctl start ghbackup
+$ sudo systemctl status ghbackup
+```
+
+Now adding a new directory to back up is as simple as creating a folder with `info.txt`:
+
+```
+$ sudo -u ghbackup bash -c 'cd /home/ghbackup/backups && mkdir jou && echo "GitHub URL: https://github.com/Akuli/jou" > jou/info.txt'
+```
