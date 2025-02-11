@@ -32,36 +32,41 @@ def issues_and_prs(owner: str, repo: str, since: datetime | None) -> Iterator[di
         r.raise_for_status()
 
         results: list[dict[str, Any]] = r.json()
-        if not results:
-            # End of list
-            break
-
         for result in results:
             yield result
+
+        if len(results) < query_params["per_page"]:
+            break
         query_params["page"] += 1
+
+
+# Example: 2 pages of 100 results are needed for 105 results, so ceildiv(105, 100) == 2.
+def ceildiv(a: int, b: int) -> int:
+    return (a + b - 1) // b
+
+
+assert ceildiv(0, 100) == 0
+assert ceildiv(1, 100) == 1
+assert ceildiv(99, 100) == 1
+assert ceildiv(100, 100) == 1
+assert ceildiv(101, 100) == 2
 
 
 def iter_comments(issue_or_pr: dict[str, Any], since: datetime | None) -> Iterator[dict[str, Any]]:
     yield issue_or_pr  # The issue/pr JSON itself has same fields that comments have
 
-    if issue_or_pr["comments"] != 0:
-        query_params: dict[str, Any] = {"page": 1, "per_page": 100}
-        if since is not None:
-            assert since.tzinfo == timezone.utc
-            query_params["since"] = since.isoformat(timespec='seconds')
+    query_params: dict[str, Any] = {"per_page": 100}
+    if since is not None:
+        assert since.tzinfo == timezone.utc
+        query_params["since"] = since.isoformat(timespec='seconds')
 
-        while True:
-            r = session.get(issue_or_pr["comments_url"], params=query_params)
-            r.raise_for_status()
-
-            results: list[dict[str, Any]] = r.json()
-            if not results:
-                # End of list
-                break
-
-            for result in results:
-                yield result
-            query_params["page"] += 1
+    num_pages = ceildiv(issue_or_pr["comments"], query_params["per_page"])
+    for page in range(1, num_pages + 1):
+        query_params["page"] = page
+        r = session.get(issue_or_pr["comments_url"], params=query_params)
+        r.raise_for_status()
+        for result in r.json():
+            yield result
 
 
 def save_comment(comment: dict[str, Any], folder: Path) -> None:
