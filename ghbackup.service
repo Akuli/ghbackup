@@ -15,7 +15,11 @@
 Description=ghbackup
 
 [Service]
-ExecStart=/bin/bash -c "python3 -u ghbackup.py backups/*/ && cd backups && git add . && if git commit -m \"Automatic github backup on $(date)\""
+# This does a few things:
+#   - Run the script on all /home/ghbackup/backups/foo/ folders
+#   - Check if anything other than repository info.txt changed (info.txt has timestamps that change every time)
+#   - If yes, commit all changes including info.txt
+ExecStart=/bin/bash -c "python3 -u ghbackup.py backups/*/; cd backups; if git status --porcelain | grep -vE '^ M [^/]*/info.txt$'; then git add . && git commit -m \"Automatic github backup on $(date)\"; fi"
 User=ghbackup
 Group=nogroup
 WorkingDirectory=/home/ghbackup
