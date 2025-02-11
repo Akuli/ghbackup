@@ -14,7 +14,7 @@ every developer has a local clone of the whole repository.
 Create a new directory, and place a file named `info.txt` in it with the following content:
 
 ```
-GitHub URL: https://github.com/Akuli/jou
+GitHub URL: https://github.com/Akuli/ghbackup
 ```
 
 (or whatever repository you want to back up). Then run:
@@ -69,7 +69,7 @@ issue_00023  issue_00050  issue_00083  pr_00010     pr_00034  pr_00058  pr_00076
 The content of `info.txt` is:
 
 ```
-GitHub URL: https://github.com/Akuli/jou
+GitHub URL: https://github.com/Akuli/ghbackup
 Updated: 2025-02-10 22:19:28.145222+00:00
 ```
 
@@ -103,44 +103,4 @@ Any thoughts on the package manager?
 
 ## Deploying
 
-I configured a server to run this script periodically.
-
-On remote server, create an account, and set permissions so that you can add files to its home folder:
-
-```
-$ sudo apt install python3-requests
-$ sudo adduser --system ghbackup
-$ sudo chown ghbackup:$USER /home/ghbackup
-$ sudo chmod g+w /home/ghbackup
-```
-
-Locally:
-
-```
-$ scp ghbackup.py my_remote_server:/home/ghbackup/ghbackup.py
-$ scp ghbackup.service my_remote_server:/tmp/
-```
-
-On remote server: (using `ghbackup$` to denote a shell running as `ghbackup` user)
-
-```
-$ sudo -u ghbackup bash
-ghbackup$ cd
-ghbackup$ umask 0022                # create readable directories and files
-ghbackup$ git init backups
-ghbackup$ cd backups
-ghbackup$ git config user.name "backup bot"
-ghbackup$ git config user.email "whatever@example.com"
-ghbackup$ exit
-$ cat /tmp/ghbackup.service | sudo tee /etc/systemd/system/ghbackup.service
-$ rm /tmp/ghbackup.service
-$ sudo systemctl enable ghbackup
-$ sudo systemctl start ghbackup
-$ sudo systemctl status ghbackup
-```
-
-Now adding a new directory to back up is as simple as creating a folder with `info.txt`:
-
-```
-$ sudo -u ghbackup bash -c 'cd /home/ghbackup/backups && mkdir jou && echo "GitHub URL: https://github.com/Akuli/jou" > jou/info.txt'
-```
+TODO: document my setup
