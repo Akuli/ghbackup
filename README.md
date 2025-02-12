@@ -123,11 +123,8 @@ I added the following to a shell script that runs every time I log in:
     ...more repos...
     while sleep 1h; do
         python3 -u ghbackup.py */ || true  # may fail due to GitHub API rate limit
-        if git status --porcelain | grep -vE '^ M [^/]*/info.txt$'; then
-            # Something other than repo updated timestamps was changed
-            git add .
-            git commit -m "Automatic github backup on $(date)"
-        fi
+        git add .
+        git commit -m "Automatic github backup on $(date)" || true  # fails if no changes
     done
 ) &>ghbackup-log.txt &
 ```
