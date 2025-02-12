@@ -142,6 +142,8 @@ def update_repo(repo_folder: Path) -> None:
         raise ValueError(f"bad GitHub URL: {github_url!r}")
     user, reponame = m.groups()
 
+    some_issue_or_pr_changed = False
+
     for issue_or_pr in issues_and_prs(user, reponame, since):
         if "pull_request" in issue_or_pr:
             print(f"  Found PR #{issue_or_pr['number']}: {issue_or_pr['title']}")
@@ -165,6 +167,7 @@ def update_repo(repo_folder: Path) -> None:
         if issue_or_pr["updated_at"] == last_updated:
             print("    Already up to date")
             continue
+        some_issue_or_pr_changed = True
 
         for comment in iter_comments(issue_or_pr, since):
             print(f"    Found comment from {comment['user']['login']}")
@@ -176,9 +179,10 @@ def update_repo(repo_folder: Path) -> None:
             file.write(f"Title: {issue_or_pr['title']}\n")
             file.write(f"Updated: {issue_or_pr['updated_at']}\n")
 
-    with repo_info_txt.open("w") as file:
-        file.write(f"GitHub URL: {github_url}\n")
-        file.write(f"Updated: {start_time}\n")
+    if some_issue_or_pr_changed:
+        with repo_info_txt.open("w") as file:
+            file.write(f"GitHub URL: {github_url}\n")
+            file.write(f"Updated: {start_time}\n")
 
 
 def main() -> None:
